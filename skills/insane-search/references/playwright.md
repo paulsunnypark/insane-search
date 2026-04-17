@@ -2,6 +2,8 @@
 
 > JS 렌더링이 필수이거나 TLS 임퍼소네이션으로도 뚫리지 않는 사이트의 최후 수단.
 > 실제 Chromium 브라우저를 구동하여 모든 JS 챌린지를 통과한다.
+>
+> **주의**: Playwright MCP가 기본(non-isolated) 모드로 실행 중이면, 다른 세션의 브라우저와 충돌할 수 있다 (`Browser is already in use`). 이 경우 `--isolated` 플래그 추가를 권장.
 
 ## 의존성
 

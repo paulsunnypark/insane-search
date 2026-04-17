@@ -29,13 +29,25 @@ HEADERS = {
 }
 
 def cffi_fetch(url, locale="ko-KR"):
-    """다중 타겟 순차 시도. 성공하면 (response, target) 반환."""
+    """다중 타겟 순차 시도 + 신원위장. 성공하면 (response, target) 반환."""
+    from urllib.parse import urlparse
+    origin = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
     for target in TARGETS:
         try:
             session = requests.Session(impersonate=target)
             session.headers.update(HEADERS)
             session.headers["Accept-Language"] = f"{locale},{locale.split('-')[0]};q=0.9"
+            session.headers["Referer"] = "https://www.google.com/"
+            # 신원위장: 홈페이지 쿠키 워밍 → Referer 체인
+            try:
+                session.get(origin, timeout=10)
+            except Exception:
+                pass  # 홈 실패해도 본 요청은 시도
+            session.headers["Referer"] = origin
             resp = session.get(url, timeout=20)
+            # JS 필수 사이트 감지 → 나머지 타겟 시도 무의미
+            if "behavioral-content" in resp.text or "sec-if-cpt" in resp.text:
+                return None, None  # → Phase 3 Playwright
             if resp.status_code == 200 and len(resp.text) > 500:
                 return resp, target
         except Exception:

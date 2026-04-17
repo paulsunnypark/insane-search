@@ -54,6 +54,45 @@ curl -sL "https://api.finance.naver.com/siseJson.naver?symbol=005930&requestType
 
 응답: `[[날짜, 시가, 고가, 저가, 종가, 거래량, 외국인거래율], ...]`
 
+## 네이버 검색 (신원위장으로 직접 접근)
+
+curl_cffi + 세션 쿠키 워밍으로 네이버 검색 결과를 직접 크롤링할 수 있다. API 키 불필요.
+
+```python
+from curl_cffi import requests
+from urllib.parse import quote
+
+s = requests.Session(impersonate="chrome124")
+s.headers.update({
+    "Accept-Language": "ko-KR,ko;q=0.9",
+    "Referer": "https://www.google.com/",
+})
+s.get("https://www.naver.com/", timeout=10)  # 쿠키 워밍
+s.headers["Referer"] = "https://www.naver.com/"
+
+# 통합 검색 (블로그+뉴스+웹 혼합)
+r = s.get(f"https://search.naver.com/search.naver?query={quote('검색어')}")
+
+# 블로그 탭
+r = s.get(f"https://search.naver.com/search.naver?where=post&query={quote('검색어')}")
+
+# 뉴스 탭
+r = s.get(f"https://search.naver.com/search.naver?where=news&query={quote('검색어')}")
+```
+
+### 추출 가능한 데이터
+
+| 탭 | URL 패턴 | 추출 |
+|---|---|---|
+| 통합 | `search.naver?query=` | 블로그 URL, 외부 링크, 뉴스 |
+| 블로그 | `where=post&query=` | blog.naver.com URL, 제목, 스니펫 |
+| 뉴스 | `where=news&query=` | n.news.naver.com URL, 제목 |
+
+### 한국어 키워드 검색의 핵심 경로
+
+WebSearch는 한국어 신규 콘텐츠 인덱싱이 지연되지만, 네이버 검색은 한국어에 최적화되어 있다.
+**한국 사이트 키워드 검색 → 네이버 검색 직접 접근이 가장 정확하고 빠르다.**
+
 ## 네이버 카페
 
 로그인 + iframe 이중 장벽. 본문 직접 접근 불가.

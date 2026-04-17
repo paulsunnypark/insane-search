@@ -20,6 +20,16 @@ description: >
 
 > URL 접근이 차단될 때, 플랫폼별 최적 방법을 자동으로 안내한다.
 
+## 의도 분류 (Phase 0 진입 전)
+
+| 사용자 입력 | 경로 |
+|------------|------|
+| URL 제공 (`https://...`) | → Phase 0~3 직접 접근 |
+| 핸들 제공 (`@username`) | → Phase 0 syndication/API |
+| 키워드만 ("X에서 AI 검색") | → WebSearch(`site:{domain} {keyword}`) 먼저 → URL 확보 후 Phase 0~3 |
+
+> **한국어 신규 콘텐츠 한계**: 네이버/다음/한국 커뮤니티의 키워드 검색은 WebSearch 경유가 유일하며, 신규 콘텐츠 인덱싱이 지연될 수 있다. URL을 직접 제공받으면 즉시 접근 가능.
+
 ## Phase 0 — 특수 엔드포인트 인덱스
 
 > 범용 체인(Phase 1~3)으로는 **발견 불가능한** 전용 API/CLI 도구만 인덱스에 둔다.
@@ -29,11 +39,11 @@ description: >
 
 | 플랫폼 | 방법 | 상세 |
 |--------|------|------|
-| X/Twitter | `syndication.twitter.com/srv/timeline-profile/...` + oEmbed | [twitter.md](references/twitter.md) |
+| X/Twitter | syndication (유명 계정 타임라인) + oEmbed (개별 트윗) + **키워드 검색: WebSearch → oEmbed** | [twitter.md](references/twitter.md) |
 | Reddit | URL + `.json` + Mobile UA | [json-api.md](references/json-api.md) |
 | Bluesky | AT Protocol (`public.api.bsky.app/xrpc/...`) | [public-api.md](references/public-api.md) |
 | Mastodon | 인스턴스별 공개 API | [public-api.md](references/public-api.md) |
-| Hacker News | Firebase API (`hacker-news.firebaseio.com/v0/...`) | [json-api.md](references/json-api.md) |
+| Hacker News | Firebase API + **Algolia Search** (`hn.algolia.com/api/v1/search`) | [json-api.md](references/json-api.md) |
 | Stack Overflow | SE API v2.3 (`api.stackexchange.com/2.3/...`) | [public-api.md](references/public-api.md) |
 | Lobste.rs / V2EX / dev.to | 공개 JSON API | [json-api.md](references/json-api.md) |
 
@@ -59,6 +69,7 @@ description: >
 
 | 플랫폼 | 방법 | 상세 |
 |--------|------|------|
+| 네이버 검색 | curl_cffi 신원위장 + `search.naver.com` (통합/블로그/뉴스탭) | [naver.md](references/naver.md) |
 | 네이버 금융 시세 | `api.finance.naver.com/siseJson.naver` (비공식 JSON) | [naver.md](references/naver.md) |
 
 **그 외 모든 사이트는 Phase 1~3이 자동 처리한다.**

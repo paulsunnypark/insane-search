@@ -137,6 +137,21 @@ browser_evaluate → () => document.body.innerText  (Light Mode — 먼저)
 - 트윗/짧은 글: 100자 이상
 - 프로필: JSON-LD Person 있으면 성공
 
+## False-Positive 마커 (HTTP 200이지만 실패)
+
+| 패턴 | 감지 방법 | 처리 |
+|------|----------|------|
+| X SPA 셸 (247KB) | 200 OK + `Sign in to X` 또는 `hasResults: false` | 실패 — WebSearch+oEmbed 폴백 |
+| CAPTCHA 페이지 | 200 OK + `captcha\|recaptcha\|hcaptcha\|cf-turnstile` | 실패 — 다음 Phase |
+| 소프트 페이월 | 200 OK + `member-only\|subscribe to read\|구독하세요` | 부분 성공 — 메타만 채택 |
+| DDG 소프트 리밋 | 202 Accepted + body 15KB 미만 | 실패 — 다른 엔진 폴백 |
+| 빈 JSON | 200 OK + `hasResults.*false\|"entries":\s*\[\]` | 실패 — 다른 방법 시도 |
+| 지역 차단 | 200 OK + `not available in your region\|geo-restricted` | 실패 — "지역 차단" 알림 |
+| WAF 소프트 블록 | 200 OK + `checking your browser\|verify you are human` | 실패 — Phase 2/3 에스컬레이션 |
+| Akamai behavioral | 200 OK + `behavioral-content\|sec-if-cpt` + `_abck` 쿠키 | 실패 — JS 실행 필수 → Phase 3 직행 (TLS 타겟 변경 무의미) |
+| RSS Content-Type 오류 | RSS 기대 + `text/html` 응답 | 실패 — "RSS 미지원" |
+| 에러 JSON | 200 OK + JSON `"error"` 키 존재 | 실패 — 에러 내용 로깅 |
+
 ## 전부 실패 시
 
 1. 시도한 Phase와 각 실패 신호를 기록

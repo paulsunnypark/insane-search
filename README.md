@@ -37,18 +37,23 @@ Just talk normally. Blocked sites will be unblocked automatically.
 ```
 "Show me what's trending on r/LocalLLaMA"
 "What did @openclaw post on X recently?"
+"Search X for posts about insane-search"
 "Summarize this YouTube video"
 "Search Coupang for under ₩100,000 keyboards"
 "Read this Naver blog post for me"
+"네이버에서 클로드코드 관련 뉴스 찾아줘"
+"Find LinkedIn articles about Claude Code plugins"
 ```
 
 ---
 
 ## Why insane-search?
 
-- **It doesn't know the word "blocked"** — No pre-judged "this site can't be accessed" labels. Every site gets the full chain. Coupang? Coupang falls. LinkedIn? JSON-LD extracted. Yozm? Chrome UA and done
+- **It doesn't know the word "blocked"** — No pre-judged "this site can't be accessed" labels. Every site gets the full chain. Coupang? Coupang falls. LinkedIn? Full article body extracted. Yozm? Chrome UA and done
+- **Identity spoofing built in** — Phase 2 doesn't just swap TLS fingerprints. It builds a full browser identity: homepage cookie warming, referrer chains, locale-matched headers. Sites like fmkorea (HTTP 430) and LinkedIn (login wall) fall to this alone
+- **Intent routing** — "Fetch this URL" and "Search X for this keyword" are different problems. insane-search routes keywords through WebSearch or Naver Search first, gets URLs, then fetches content. Two-stage pipeline, automatic
 - **Installs its own weapons** — Missing `curl_cffi` for TLS fingerprint bypass? Installs it. Missing `feedparser`? Installs it. Missing `yt-dlp`? Installs it. You don't even notice
-- **5 probe phases, not 1** — WebFetch → Jina → curl UA/URL variants → TLS impersonation (safari/chrome/firefox) → real browser. Each phase escalates only when the previous hits a wall
+- **5 probe phases, not 1** — WebFetch → Jina → curl UA/URL variants → TLS impersonation with identity spoofing → real browser. Each phase escalates only when the previous hits a wall
 - **Finds hidden APIs** — Phase 3 doesn't just render the page. It watches the browser's network traffic, catches the actual JSON API the site uses internally, and hands it back for reuse
 - **Zero setup friction** — No API keys, no OAuth, no developer portals. Everything runs on public endpoints and auto-installable libraries
 
@@ -67,8 +72,10 @@ Phase 1: Lightweight probes (parallel)
   • URL variants: m.{domain}, .json, /rss, /feed
   • Sidecar: AMP cache, archive.today, Wayback (low-trust)
   ↓ 403/429/WAF headers/challenge body detected
-Phase 2: TLS impersonation
+Phase 2: TLS impersonation + identity spoofing
   • curl_cffi with safari → chrome → firefox
+  • Identity spoofing: homepage cookie warming → referrer chain → locale headers
+  • Behavioral challenge detection (Akamai _abck) → skip to Phase 3
   • Auto-installs if missing: pip install curl_cffi
   ↓ TLS bypass failed or JS challenge detected
 Phase 3: Full browser
@@ -92,11 +99,11 @@ Only special endpoints that the generic chain can't discover on its own. Everyth
 
 | Platform | Method | Reference |
 |----------|--------|-----------|
-| X/Twitter | `syndication.twitter.com/srv/timeline-profile/...` + oEmbed | `twitter.md` |
+| X/Twitter | syndication (timeline) + oEmbed (single tweet) + **WebSearch keyword search** | `twitter.md` |
 | Reddit | URL + `.json` + Mobile UA | `json-api.md` |
 | Bluesky | AT Protocol (`public.api.bsky.app/xrpc/...`) | `public-api.md` |
 | Mastodon | Per-instance public API | `public-api.md` |
-| Hacker News | Firebase API (`hacker-news.firebaseio.com/v0/...`) | `json-api.md` |
+| Hacker News | Firebase API + **Algolia Search** (`hn.algolia.com/api/v1/search`) | `json-api.md` |
 | Stack Overflow | SE API v2.3 | `public-api.md` |
 | Lobste.rs / V2EX / dev.to | Public JSON APIs | `json-api.md` |
 
@@ -122,9 +129,10 @@ Only special endpoints that the generic chain can't discover on its own. Everyth
 
 | Platform | Method | Reference |
 |----------|--------|-----------|
+| Naver Search | curl_cffi identity spoofing + `search.naver.com` (통합/블로그/뉴스) | `naver.md` |
 | Naver Finance (stock prices) | `api.finance.naver.com/siseJson.naver` (unofficial, no auth) | `naver.md` |
 
-**Everything else flows through Phase 1~3 automatically** — including Coupang (curl_cffi safari), LinkedIn (JSON-LD extraction), Medium (Jina), most Korean forums (Jina or curl), and any site with `/rss` or `/feed` endpoints.
+**Everything else flows through Phase 1~3 automatically** — including Coupang (curl_cffi safari), LinkedIn (identity spoofing → JSON-LD full article body), fmkorea (identity spoofing), Medium (Jina), most Korean forums (Jina or curl), and any site with `/rss` or `/feed` endpoints.
 
 ---
 
@@ -139,10 +147,10 @@ The skill is organized as a set of reference files, each covering one class of t
 | `json-api.md` | Public JSON APIs (Reddit, HN, dev.to, Wikipedia, npm, PyPI, etc.) |
 | `public-api.md` | Bluesky, Mastodon, Stack Exchange, arXiv, CrossRef, OpenLibrary, GitHub, Wayback |
 | `media.md` | yt-dlp usage for 1,858 media sites |
-| `twitter.md` | Twitter Syndication API + oEmbed |
-| `naver.md` | Naver blog mobile URLs, Naver Finance JSON API |
+| `twitter.md` | Twitter Syndication API + oEmbed + WebSearch keyword search |
+| `naver.md` | Naver Search (curl_cffi identity spoofing), blog mobile URLs, Finance JSON API |
 | `rss.md` | Korean news RSS (9 outlets), Google News RSS, feedparser, SearXNG |
-| `tls-impersonate.md` | curl_cffi multi-target (safari/chrome/firefox) + auto-install |
+| `tls-impersonate.md` | curl_cffi multi-target + identity spoofing (cookie warming, referrer chain) + behavioral challenge detection |
 | `playwright.md` | Playwright MCP full toolkit (snapshot, evaluate, network_requests) |
 | `cache-archive.md` | Google AMP cache, archive.today, Wayback Machine |
 | `metadata.md` | OGP, JSON-LD, Schema.org, Next.js RSC payload extraction |
@@ -200,6 +208,15 @@ There are no commands. Just talk normally. The skill triggers automatically when
 
 "Check what people are saying about Claude Code on Reddit"
 → Reddit JSON API with Mobile UA → posts + top comments
+
+"Search X for insane-search"
+→ Intent routing: keyword search → WebSearch(site:x.com) → oEmbed → full tweets
+
+"네이버에서 클로드코드 뉴스 찾아줘"
+→ Naver Search (identity spoofing) → news tab → article URLs → Jina Reader
+
+"Find LinkedIn articles about AI agents"
+→ WebSearch(site:linkedin.com) → identity spoofing → JSON-LD articleBody
 ```
 
 ---
