@@ -25,13 +25,43 @@
 
 ## ⚡ 설치
 
+### Claude Code
+
 ```bash
 /plugin marketplace add https://github.com/fivetaku/gptaku_plugins.git
 /plugin install insane-search@gptaku-plugins
 /reload-plugins
 ```
 
-외울 명령어는 없다. 평소처럼 Claude Code에게 말하면, fetch가 막히는 순간 insane-search가 알아서 끼어든다.
+### Codex
+
+이 저장소를 로컬 Codex 플러그인으로 설치하려면:
+
+```bash
+mkdir -p ~/plugins
+git clone https://github.com/paulsunnypark/insane-search.git ~/plugins/insane-search
+codex plugin add insane-search@personal
+```
+
+personal marketplace에 아직 등록되어 있지 않다면
+`~/.agents/plugins/marketplace.json`에 다음 entry를 추가합니다:
+
+```json
+{
+  "name": "insane-search",
+  "source": {
+    "source": "local",
+    "path": "./plugins/insane-search"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Productivity"
+}
+```
+
+외울 명령어는 없다. 평소처럼 Claude Code나 Codex에게 말하면, fetch가 막히는 순간 insane-search가 알아서 끼어든다.
 
 ## 💬 이렇게 써보세요
 

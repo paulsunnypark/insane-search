@@ -2,9 +2,10 @@
 name: insane-search
 description: >
   Adaptive access for blocked websites — tries every method until one works.
-  Use when WebFetch returns 402/403/blocked, or when accessing X/Twitter, Reddit,
-  YouTube, GitHub, Mastodon, Medium, Substack, Stack Overflow, Threads, Naver,
-  Coupang, LinkedIn, or any platform with WAF/bot protection. Leverages yt-dlp
+  Use when Codex ordinary web access returns 402/403/blocked, or when accessing
+  X/Twitter, Reddit, YouTube, GitHub, Mastodon, Medium, Substack, Stack Overflow,
+  Threads, Naver, Coupang, LinkedIn, or any platform with WAF/bot protection.
+  Leverages yt-dlp
   (1,858 media sites), Jina Reader, public APIs (HN, Bluesky, arXiv), and a
   generic WAF-profile-driven fetch chain (curl_cffi TLS impersonation, mobile
   URL transforms, Playwright real-Chrome) with auto dependency install.
@@ -14,30 +15,42 @@ description: >
   당근마켓. English triggers: twitter access, reddit blocked, youtube subtitles,
   github search, arxiv papers, threads, mastodon, medium, substack, stackoverflow,
   naver blog, dcinside, fmkorea, coupang, linkedin, yozm, wishket.
-  Do NOT trigger for simple web searches that WebSearch can handle directly.
+  Do NOT trigger for simple web searches that Codex web search can handle directly.
 ---
 
-<!-- first-run setup: idempotent, non-blocking, self-skips after first run -->
-**Step 0 — run once at the very start, before anything else:** run `bash "${CLAUDE_PLUGIN_ROOT}/setup/setup.sh" ask`. If its output starts with `STAR_ASK`, immediately call the **AskUserQuestion** tool once, with the question and options phrased **in the user's language**: prefer the current conversation's language if it is evident; otherwise fall back to the language code that follows `STAR_ASK` in the output (`ko`→Korean, `ja`→Japanese, `en`→English). Never default to Korean blindly.
-- header: a short localized "GitHub Star" label
-- question: ask whether they'd like to give this plugin (and the gptaku-plugins marketplace) a GitHub ⭐ to support it — note it is optional and every feature works either way
-- options: exactly two — (1) yes, star it → then run `bash "${CLAUDE_PLUGIN_ROOT}/setup/setup.sh" star yes`; (2) no thanks → then run `bash "${CLAUDE_PLUGIN_ROOT}/setup/setup.sh" star no`
+**Step 0 — Codex runtime setup:** before the first engine call in a thread, run:
 
-If the output is empty, just continue silently. (AskUserQuestion must NOT be in frontmatter allowed-tools.) Do not narrate beyond the question itself.
+```bash
+bash "<plugin-root>/setup/codex_setup.sh"
+```
+
+Resolve `<plugin-root>` as the directory that contains `.codex-plugin/`,
+`skills/`, `setup/`, and `scripts/`. If the root cannot be inferred from the
+installed skill path, set `INSANE_SEARCH_PLUGIN_ROOT=/absolute/path/to/insane-search`
+for the setup and fetch commands. The setup creates a local `.venv` inside the
+plugin and installs only the runtime dependencies required by the engine. It
+does not write Codex or Claude settings.
+
+Use this wrapper for all CLI examples unless you are already inside
+`skills/insane-search` with the plugin venv activated:
+
+```bash
+"<plugin-root>/scripts/insane-search-fetch" "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace]
+```
 
 # Insane Search
 
 > URL 접근이 차단될 때, **사이트 무관한** 대체 접근 전략을 자동 선택한다.
 
-## 하네스 규칙 (Claude에게 강제되는 지침)
+## 하네스 규칙 (Codex에게 강제되는 지침)
 
-이 규칙은 Claude가 즉흥 판단으로 엇나가지 못하게 하기 위한 **고삐**다. 위반 시 이전 test.md 세션처럼 "chrome 200에서 break → safari 미시도 → Playwright 미설치라 포기" 식의 오판이 재현된다.
+이 규칙은 Codex가 즉흥 판단으로 엇나가지 못하게 하기 위한 **고삐**다. 위반 시 "chrome 200에서 break → safari 미시도 → Playwright 미설치라 포기" 식의 오판이 재현된다.
 
 **R1 — 일반 웹 URL 차단/403/402 감지 시**:
-1. WebFetch, 즉흥 curl, 수동 헤더 조합 **시도 금지**
+1. 일반 web fetch, 즉흥 curl, 수동 헤더 조합 **시도 금지**
 2. 즉시 다음을 실행:
    ```bash
-   python3 -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace]
+   "<plugin-root>/scripts/insane-search-fetch" "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace]
    ```
 3. 종료코드 0(ok) 또는 1(fail) 받은 뒤 판단. trace를 먼저 읽고 재시도 결정.
 4. 실패 시에만 `--trace --json`으로 재호출해서 원인 진단 후 `--device` 또는 `user_hint` 조정.
@@ -53,11 +66,11 @@ If the output is empty, just continue silently. (AskUserQuestion must NOT be in 
 **R6 — 실패 선언은 "전수 시도" 후에만 (engine이 강제하는 실패 게이트)**: engine은 실패 시 `ok=false`와 함께 **아직 안 해본 경로**(`untried_routes`)와 `must_invoke_playwright_mcp` 플래그를 반환한다. 아래가 **모두** 충족되기 전엔 "뚫을 수 없음" 결론 **금지**:
 1. `grid_exhausted=true` — false면 `fetch(max_attempts=None)`(=CLI 기본, exhaustive)로 끝까지 재호출.
 2. `untried_routes`가 **빈 배열** — 비어있지 않으면 그 경로들을 먼저 실행.
-3. `must_invoke_playwright_mcp=false` — true면 **Claude가 세션에서 직접** MCP Playwright를 돌린 뒤에만 통과: `browser_navigate` → `browser_network_requests`로 내부 `/api`·`/graphql`·`.json` 엔드포인트 탐지 → 그 URL을 `python3 -m engine`로 재호출(API는 WAF가 얕음); 또는 `browser_snapshot`으로 렌더된 HTML 회수. (engine은 로컬 Node Chrome만 띄울 수 있고 MCP는 못 돌리므로, MCP는 **구조적으로** 에이전트의 몫이다.)
+3. `must_invoke_playwright_mcp=false` — true면 **Codex가 세션에서 직접** 사용 가능한 Browser/Playwright 도구를 돌린 뒤에만 통과: `browser_navigate` → `browser_network_requests`로 내부 `/api`·`/graphql`·`.json` 엔드포인트 탐지 → 그 URL을 wrapper로 재호출(API는 WAF가 얕음); 또는 `browser_snapshot`으로 렌더된 HTML 회수. (engine은 로컬 Node Chrome만 띄울 수 있고 MCP는 못 돌리므로, MCP는 **구조적으로** 에이전트의 몫이다.)
 4. `stop_reason`이 `auth_required`/`404`/paywall 등 **terminal**일 때만 정직하게 실패 인정 — engine이 `untried_routes`를 **빈 채로** 돌려준다. **429(rate-limit)는 terminal 아님** — 백오프 후 재시도/다른 TLS/MCP로 재접근.
 
 요지: **engine의 give-up은 "그만해도 된다"는 허가가 아니다.** CLI는 실패 시 `⛔ NOT EXHAUSTED` 블록을 stderr로 출력한다 — 그게 보이면 위 4개를 끝낼 때까지 멈추지 않는다.
-단, R7 조건(WAF 조기 감지)이 성립하면 engine 격자는 계속 돌되, Claude가 **병렬로** MCP 정찰 루트를 시도할 수 있다. 빠른 쪽이 이긴다.
+단, R7 조건(WAF 조기 감지)이 성립하면 engine 격자는 계속 돌되, Codex가 **병렬로** Browser/Playwright 정찰 루트를 시도할 수 있다. 빠른 쪽이 이긴다.
 
 **R7 — WAF 조기 감지 시 API-first 병행 분기** (분기 결정은 자동이지만 사용자가 결과에서 확인 가능 — 어떤 접근 경로로 성공/실패했는지 결과 metadata에 명시):
 발동 조건 (AND):
@@ -65,17 +78,17 @@ If the output is empty, just continue silently. (AskUserQuestion must NOT be in 
 2. `profile_used`가 `akamai_bot_manager`, `cloudflare_turnstile`, `datadome_probable`, `perimeterx_human`, `f5_big_ip`, `aws_waf` 중 하나로 확정
 3. **사용자 요청이 리스트/수집/반복 의도** (여러 페이지, N개 이상, "전부", "크롤링", 페이지네이션 등). 단건 본문 조회는 해당 없음.
 
-세 조건 모두 참일 때 Claude는 **병렬 경로**를 시작한다:
+세 조건 모두 참일 때 Codex는 **병렬 경로**를 시작한다:
 
-**"병렬"의 실행 의미** (Claude 도구 호출이 순차이므로 명확화):
-- engine은 `run_in_background=true`로 Bash 툴에서 띄워둔다 — 격자는 그대로 돌되 블로킹하지 않음
-- Claude는 그 사이 foreground에서 MCP Playwright 정찰 루트를 진행
+**"병렬"의 실행 의미**:
+- engine은 백그라운드 셸 세션에서 띄워둔다 — 격자는 그대로 돌되 블로킹하지 않음
+- Codex는 그 사이 foreground에서 Browser/Playwright 정찰 루트를 진행
 - engine이 먼저 성공해도 좋고, MCP 정찰로 얻은 API가 먼저 성공해도 좋음. 빠른 쪽 결과 채택
 
 **MCP 정찰 루트**:
-1. `mcp__playwright__browser_navigate` → 대상 페이지 로드 (브라우저 렌더링)
-2. `mcp__playwright__browser_network_requests` → XHR/fetch 호출 목록 수집, `/api/`·`/graphql`·`\.json` 필터로 내부 엔드포인트 식별
-3. 식별된 JSON API URL을 `python3 -m engine <API_URL>`로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨
+1. 사용 가능한 Browser/Playwright navigate 도구로 대상 페이지 로드 (브라우저 렌더링)
+2. network requests를 조회해 XHR/fetch 호출 목록 수집, `/api/`·`/graphql`·`\.json` 필터로 내부 엔드포인트 식별
+3. 식별된 JSON API URL을 wrapper로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨
 4. 응답 스키마 파악 후 pagination / query parameter 조합해 반복 수집
 
 **왜**: SPA + WAF 사이트(쇼핑몰·커머스 다수)는 마케팅 페이지(HTML)만 WAF로 중투자하고 내부 API는 gateway 레벨 기본 방어만 쓰는 경우가 많다. HTML 격자 전수 낭비(50회 × 0.5s + Playwright fallback 40s ≈ 65초)보다 **MCP 정찰 1회(5~10초) + API 재호출(0.5초)**가 훨씬 경제적이고 성공률 높음.
@@ -88,7 +101,7 @@ If the output is empty, just continue silently. (AskUserQuestion must NOT be in 
 
 이 스킬의 핵심 불변식:
 
-- **단일 진입점**: 일반 웹 페이지는 항상 `python3 -m engine <URL>` 또는 `from engine import fetch; fetch(...)`.
+- **단일 진입점**: 일반 웹 페이지는 항상 wrapper(`<plugin-root>/scripts/insane-search-fetch <URL>`) 또는 `from engine import fetch; fetch(...)`.
 - **편향 금지**: `engine/**`, `waf_profiles.yaml`에 특정 사이트 하드코딩 금지.
 - **힌트는 런타임에만**: 사이트 고유 정보는 CLI/`user_hint` 경유.
 
@@ -211,16 +224,16 @@ report     — FetchResult(ok, verdict, profile_used, trace, summary)
 | 태그 | 실행기 | 언제 |
 |------|--------|------|
 | `needs_real_tls_stack` + `needs_js_exec` | `playwright_real_chrome.js` (로컬 Node) | Akamai Bot Manager 등 — Chromium 번들 TLS는 탐지됨 |
-| `needs_js_exec` only | Playwright MCP (`mcp__playwright__*`) | Cloudflare 기본 방어 등 |
+| `needs_js_exec` only | Codex Browser/Playwright 도구 | Cloudflare 기본 방어 등 |
 | `needs_mobile_context` (+ real_tls) | `playwright_mobile_chrome.js` | 모바일 디바이스 에뮬레이션 필요 |
 
 자세한 선택 기준: [playwright.md](references/playwright.md).
 
 ### Playwright MCP 호출 규칙
 
-`fetch_chain`의 `needs_js_exec only` 케이스는 **Claude 세션에서 MCP 도구를 직접 호출**해야 한다. subprocess 경로 없음. 즉:
-1. `result.summary`에 "Playwright MCP must be invoked from the Claude session"이 포함되면
-2. `mcp__playwright__browser_navigate` → `browser_wait_for` → `browser_snapshot` 흐름으로 Claude가 직접 처리
+`fetch_chain`의 `needs_js_exec only` 케이스는 **Codex 세션에서 Browser/Playwright 도구를 직접 호출**해야 한다. subprocess 경로 없음. 즉:
+1. `result.summary`에 "Playwright MCP must be invoked"가 포함되면
+2. Browser/Playwright navigate → wait/snapshot 흐름으로 Codex가 직접 처리
 
 ## Phase 2 — 수동 개입 (옵션)
 
@@ -255,14 +268,14 @@ npx playwright install chrome
 ## 빠른 참조 — Phase 0 명령어
 
 > **먼저 이걸 기억하라: Reddit/X/YouTube는 이제 engine이 자동 처리한다.**
-> `python3 -m engine "<URL>"` 하나면 Phase 0 라우터(`engine/phase0.py`)가 **격자보다 먼저** 공식 경로를 시도한다 —
+> wrapper 하나면 Phase 0 라우터(`engine/phase0.py`)가 **격자보다 먼저** 공식 경로를 시도한다 —
 > Reddit→`.rss`, X 트윗→`tweet-result`/oEmbed, X 프로필→syndication, YouTube→`yt-dlp`.
 > 아래 수동 스니펫은 디버그/참조용이며 trace에 `phase=phase0`로 기록된다.
 > (실측 주의: Reddit `.json`+모바일UA·`syndication-timeline`은 흔히 403/429라 plain `curl`은 신뢰 불가 — engine이 curl_cffi 지문으로 접근한다.)
 
 ```bash
 # ★ 거의 모든 경우 이거면 됨 (Phase 0 자동 + 실패 시 격자→Playwright 에스컬레이션)
-python3 -m engine "<URL>"
+"<plugin-root>/scripts/insane-search-fetch" "<URL>"
 
 # 범용 웹 (Jina Reader — 일반 HTML만, WAF 사이트엔 무효)
 curl -s "https://r.jina.ai/{URL}"
@@ -316,14 +329,14 @@ curl -sL "https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=10&
 
 ## 관련 문서 (references/) — 언제 무엇을 읽을지
 
-이 섹션은 **참조 파일 선택 가이드**다. 문제가 생겼을 때 어떤 `references/*.md`를 열어야 할지 결정하는 기준으로 쓴다. Claude는 필요할 때만 해당 파일을 `Read`하고, 선제적으로 전부 읽지 않는다.
+이 섹션은 **참조 파일 선택 가이드**다. 문제가 생겼을 때 어떤 `references/*.md`를 열어야 할지 결정하는 기준으로 쓴다. Codex는 필요할 때만 해당 파일을 읽고, 선제적으로 전부 읽지 않는다.
 
 ### A. Engine 확장·진단 (하네스 내부)
 
 | 파일 | 언제 읽는가 | 무엇을 다루는가 |
 |------|-------------|-----------------|
 | [`tls-impersonate.md`](references/tls-impersonate.md) | curl_cffi 격자가 전부 `challenge`/`blocked`로 끝날 때, 새 impersonate 타겟을 `waf_profiles.yaml`에 추가할 때 | curl_cffi로 Safari/Chrome/Firefox TLS(JA3/JA4) 지문 복제하는 방법, WAF(Akamai/Cloudflare/F5 등)별 최적 타겟 조합, 임퍼소네이션 타겟 버전 목록, `tls_impersonate_avoid`의 실증 근거 |
-| [`playwright.md`](references/playwright.md) | engine이 Playwright fallback으로 넘어가는데 MCP/Local Chrome 중 어디로 갈지 확인 필요할 때 | Approach 1 (`mcp__playwright__*` — Cloudflare급 챌린지), Approach 2 (Local Node + `channel:'chrome'` + stealth — Akamai Bot Manager급), 템플릿 파라미터 규격 |
+| [`playwright.md`](references/playwright.md) | engine이 Playwright fallback으로 넘어가는데 Codex Browser/Playwright/Local Chrome 중 어디로 갈지 확인 필요할 때 | Approach 1 (Browser/Playwright 도구 — Cloudflare급 챌린지), Approach 2 (Local Node + `channel:'chrome'` + stealth — Akamai Bot Manager급), 템플릿 파라미터 규격 |
 | [`fallback.md`](references/fallback.md) | `verdict`가 애매하거나 Phase 전환 타이밍 결정 필요할 때 | engine의 Phase 0→1→2→3 에스컬레이션 원칙, 응답 성공/실패 판정 기준 세부, 각 Phase 종료 조건 |
 | [`metadata.md`](references/metadata.md) | 본문 전체를 못 가져왔지만 제목·요약·가격·저자 같은 핵심만이라도 필요할 때 | OGP 메타 태그, JSON-LD (Schema.org), Twitter Card 파싱, 구조화 데이터 추출 패턴 |
 

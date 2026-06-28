@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT="${INSANE_SEARCH_PLUGIN_ROOT:-$DEFAULT_ROOT}"
+PYTHON_BIN="$(bash "$ROOT/setup/codex_setup.sh")"
+
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+cd "$ROOT/skills/insane-search"
+exec "$PYTHON_BIN" -m engine "$@"

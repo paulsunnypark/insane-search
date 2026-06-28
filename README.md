@@ -25,13 +25,43 @@ A resilient public-page reader for Claude Code. No API keys, no proxy setup.
 
 ## ⚡ Install
 
+### Claude Code
+
 ```bash
 /plugin marketplace add https://github.com/fivetaku/gptaku_plugins.git
 /plugin install insane-search@gptaku-plugins
 /reload-plugins
 ```
 
-No commands to learn. Ask Claude Code normally — insane-search kicks in when a fetch gets blocked.
+### Codex
+
+For a local Codex install from this repository:
+
+```bash
+mkdir -p ~/plugins
+git clone https://github.com/paulsunnypark/insane-search.git ~/plugins/insane-search
+codex plugin add insane-search@personal
+```
+
+If your personal marketplace does not already include this plugin, add this entry to
+`~/.agents/plugins/marketplace.json`:
+
+```json
+{
+  "name": "insane-search",
+  "source": {
+    "source": "local",
+    "path": "./plugins/insane-search"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Productivity"
+}
+```
+
+No commands to learn. Ask Claude Code or Codex normally — insane-search kicks in when a fetch gets blocked.
 
 ## 💬 Try it
 

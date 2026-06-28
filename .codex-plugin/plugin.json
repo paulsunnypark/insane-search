@@ -1,0 +1,46 @@
+{
+  "name": "insane-search",
+  "version": "0.8.2+codex.20260628020302",
+  "description": "Adaptive public-page reader for blocked or WAF-protected sites.",
+  "author": {
+    "name": "fivetaku",
+    "url": "https://github.com/fivetaku"
+  },
+  "homepage": "https://github.com/fivetaku/insane-search",
+  "repository": "https://github.com/fivetaku/insane-search",
+  "license": "MIT",
+  "keywords": [
+    "web-access",
+    "search",
+    "webfetch",
+    "access-fallback",
+    "jina",
+    "yt-dlp",
+    "twitter",
+    "reddit",
+    "youtube",
+    "naver",
+    "curl_cffi",
+    "tls-impersonation",
+    "playwright"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Insane Search",
+    "shortDescription": "Reads public pages through resilient fallback routes.",
+    "longDescription": "Insane Search strengthens Codex web research by escalating through official public routes, feeds, TLS impersonation, metadata extraction, and browser fallback when ordinary access is blocked. It is limited to public content and stops at authentication or paywalls.",
+    "developerName": "fivetaku",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Web"
+    ],
+    "websiteURL": "https://github.com/fivetaku/insane-search",
+    "defaultPrompt": [
+      "Summarize this blocked public URL.",
+      "Find public Reddit posts and summarize them.",
+      "Extract captions from this YouTube video."
+    ],
+    "brandColor": "#3FB950"
+  }
+}

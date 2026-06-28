@@ -23,6 +23,7 @@ evals/
 *-workspace/
 
 # Environment
+.venv/
 .env
 .env.local
 .omc/
