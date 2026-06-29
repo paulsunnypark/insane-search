@@ -27,7 +27,10 @@
 
 ### Claude Code
 
+Claude cli
 ```bash
+claude --dangerously-skip-permissions
+
 /plugin marketplace add https://github.com/fivetaku/gptaku_plugins.git
 /plugin install insane-search@gptaku-plugins
 /reload-plugins
